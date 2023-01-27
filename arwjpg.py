@@ -10,7 +10,7 @@ from os import listdir
 from os.path import isfile, join
 from joblib import Parallel, delayed
 from tqdm import tqdm
-
+from datetime import date, datetime
 
 
 def make_dir(dir_path):
@@ -113,6 +113,14 @@ def parse_args(args):
         required=False, 
         type=int, 
         default=8)
+    parser.add_argument('--date_from', help='2012-12-14',
+        required=False,
+        type=lambda d: datetime.strptime(d, '%Y-%m-%d').date(),
+        default=date(1970, 1, 1))
+    parser.add_argument('--date_to', help='2012-12-14',
+        required=False,
+        type=lambda d: datetime.strptime(d, '%Y-%m-%d').date(),
+        default=date.today())
     return parser.parse_args(args)
 
 
@@ -182,12 +190,21 @@ def get_rawpy_params(args):
         'output_bps': args.output_bps if args.output_bps == 8 or args.output_bps == 16 else 8
     }
 
-def get_arw_files(dir_path):
+def get_arw_files(dir_path, date_from, date_to):
     """
     :param dir_path: Directory path where ARW files live.
-    :return: A list of just the ARW file names.
+    :param date_from: Earliest date of shooting.
+    :param date_to: Latest date of shooting. 
+    :return: A list of just the ARW file names whose shooting date range from date_from to date_to.
     """
-    arw_files = [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
+    arw_files = []
+    for f in listdir(dir_path):
+        file_path = join(dir_path, f)
+        if isfile(file_path) and (file_path.endswith('arw') or file_path.endswith('ARW')):
+            modified_date = date.fromtimestamp(os.path.getmtime(file_path))
+            if date_from <= modified_date and modified_date <= date_to:
+                arw_files.append(f)
+                
     return arw_files
 
 
@@ -208,18 +225,29 @@ def get_target_files(target_dir, files, ext='JPG'):
     :param files: List of ARW files in the ARW directory.
     :return: List of JPG target files.
     """
-    target_files = [join(target_dir, f).replace('ARW', ext).replace('arw', ext) for f in files]
+    target_files = []
+    
+    for file in files:
+        path = join(target_dir, file)
+        if path.endswith("arw"):
+            path = path[::-1].replace('wra', ext[::-1], 1)[::-1]
+        else:
+            path = path[::-1].replace('WRA', ext[::-1], 1)[::-1]
+            
+        target_files.append(path)
     target_files = [f.replace('\\', '/') for f in target_files]
     return target_files
 
 
-def get_source_target_files(source_dir, target_dir, ext='JPG'):
+def get_source_target_files(source_dir, date_from, date_to, target_dir, ext='JPG'):
     """
     :param source_dir: ARW source directory path.
+    :param date_from: Earliest date of shooting.
+    :param date_to: Latest date of shooting.
     :param target_dir: JPG target directory path.
     :return: List of tuples. Each tuple has a source ARW and target JPG file path.
     """
-    arw_files = get_arw_files(source_dir)
+    arw_files = get_arw_files(source_dir, date_from, date_to)
     source_files = get_source_files(source_dir, arw_files)
     target_files = get_target_files(target_dir, arw_files, ext)
     tups = [(s, t) for s, t in zip(source_files, target_files)]
@@ -235,7 +263,7 @@ if __name__ == "__main__":
     rawpy_params = get_rawpy_params(args)
 
     ext = args.extension.upper() if args.extension.upper() == 'JPG' or args.extension.upper() == 'TIFF' else 'JPG'
-    tups = get_source_target_files(args.source, args.target, ext)
+    tups = get_source_target_files(args.source, args.date_from, args.date_to, args.target, ext)
     verbosity = args.verbosity
     n_jobs = multiprocessing.cpu_count()
     results = Parallel(n_jobs=n_jobs, verbose=verbosity)(delayed(convert_raw)(tup[0], tup[1], rawpy_params) for tup in tqdm(tups))

@@ -50,6 +50,7 @@ usage: arwjpg.py [-h] -s SOURCE -t TARGET [-v VERBOSITY] [-e EXTENSION]
                  [--demosaic_algorithm DEMOSAIC_ALGORITHM]
                  [--fbdd_noise_reduction FBDD_NOISE_REDUCTION]
                  [--output_color OUTPUT_COLOR] [--output_bps OUTPUT_BPS]
+                 [--date_from DATE_FROM] [--date_to DATE_TO]
 
 Convert ARW to JPG
 
@@ -91,6 +92,8 @@ optional arguments:
                         sRGB
   --output_bps OUTPUT_BPS
                         8 or 16
+  --date_from DATE_FROM[YYYY-MM-DD] earliest date of shooting, default 1970-01-01
+  --date_to DATE_TO[YYYY-MM-DD]  latest date of shooting, default now
 ```
 
 # Citation
